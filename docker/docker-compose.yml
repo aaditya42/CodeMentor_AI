@@ -1,0 +1,119 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: codementor-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: codementor
+      POSTGRES_PASSWORD: codementor_pass
+      POSTGRES_DB: codementor_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codementor"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: codementor-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+
+  adminer:
+    image: adminer
+    container_name: codementor-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
+  ai-service:
+    build:
+      context: ../ai-service
+      dockerfile: Dockerfile
+    container_name: codementor-ai
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../.env
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - FAISS_INDEX_DIR=/app/data/faiss_indexes
+      - KNOWLEDGE_BASE_DIR=/app/data/knowledge_base
+    volumes:
+      - faiss_data:/app/data/faiss_indexes
+      - knowledge_data:/app/data/knowledge_base
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  judge0:
+    image: judge0/judge0-ce:1.13.1
+    container_name: codementor-judge0
+    restart: unless-stopped
+    ports:
+      - "2358:2358"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=judge0-db
+      - POSTGRES_DB=judge0
+      - POSTGRES_USER=judge0
+      - POSTGRES_PASSWORD=judge0_pass
+      - ENABLE_WAIT_RESULT=true
+      - ENABLE_BATCHED_SUBMISSIONS=true
+      - MAX_CPU_TIME_LIMIT=10
+      - MAX_MEMORY_LIMIT=512000
+    depends_on:
+      redis:
+        condition: service_healthy
+      judge0-db:
+        condition: service_healthy
+    privileged: true
+
+  judge0-db:
+    image: postgres:16-alpine
+    container_name: codementor-judge0-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: judge0_pass
+      POSTGRES_DB: judge0
+    volumes:
+      - judge0_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U judge0"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
+  faiss_data:
+  knowledge_data:
+  judge0_pg_data:
+

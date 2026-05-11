@@ -1,0 +1,203 @@
+// Prisma Schema — CodeMentor AI
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Enums ---
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum Language {
+  PYTHON
+  CPP
+  JAVA
+  JAVASCRIPT
+}
+
+enum SubmissionStatus {
+  PENDING
+  ACCEPTED
+  WRONG_ANSWER
+  TIME_LIMIT_EXCEEDED
+  RUNTIME_ERROR
+  COMPILATION_ERROR
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+// --- Models ---
+
+model User {
+  id            String          @id @default(uuid())
+  email         String          @unique
+  username      String          @unique
+  passwordHash  String
+  displayName   String?
+  avatarUrl     String?
+  role          Role            @default(USER)
+  oauthProvider String?
+  oauthId       String?
+  submissions   Submission[]
+  conversations Conversation[]
+  hintHistories HintHistory[]
+  analytics     UserAnalytics?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([email])
+  @@index([username])
+}
+
+model Problem {
+  id            String         @id @default(uuid())
+  title         String
+  slug          String         @unique
+  description   String         @db.Text
+  difficulty    Difficulty
+  topics        String[]
+  companies     String[]
+  constraints   String         @db.Text
+  examples      Json
+  starterCode   Json
+  editorialHint String?        @db.Text
+  testCases     TestCase[]
+  submissions   Submission[]
+  conversations Conversation[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([slug])
+  @@index([difficulty])
+}
+
+model TestCase {
+  id        String  @id @default(uuid())
+  input     String  @db.Text
+  expected  String  @db.Text
+  isHidden  Boolean @default(false)
+  problemId String
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@index([problemId])
+}
+
+model Submission {
+  id             String           @id @default(uuid())
+  code           String           @db.Text
+  language       Language
+  status         SubmissionStatus @default(PENDING)
+  runtime        Int?
+  memory         Int?
+  astAnalysis    Json?
+  complexityInfo Json?
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problemId      String
+  problem        Problem          @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  createdAt      DateTime         @default(now())
+
+  @@index([userId])
+  @@index([problemId])
+  @@index([userId, problemId])
+}
+
+model Conversation {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problemId String
+  problem   Problem   @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  hintLevel Int       @default(1)
+  metadata  Json?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([userId, problemId])
+  @@index([userId])
+  @@index([problemId])
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  role           MessageRole
+  content        String       @db.Text
+  hintLevel      Int?
+  metadata       Json?
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+}
+
+model HintHistory {
+  id        String   @id @default(uuid())
+  hintLevel Int
+  content   String   @db.Text
+  relevance Float?
+  wasHelpful Boolean?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problemId String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([problemId])
+}
+
+model RetrievalLog {
+  id            String   @id @default(uuid())
+  query         String   @db.Text
+  retrievedDocs Json
+  scores        Json
+  latencyMs     Int
+  createdAt     DateTime @default(now())
+}
+
+model Evaluation {
+  id                String   @id @default(uuid())
+  hintId            String
+  relevanceScore    Float
+  hallucination     Boolean  @default(false)
+  solutionLeakage   Boolean  @default(false)
+  responseLatencyMs Int
+  userRating        Int?
+  createdAt         DateTime @default(now())
+
+  @@index([hintId])
+}
+
+model UserAnalytics {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalSubmissions    Int      @default(0)
+  acceptedCount       Int      @default(0)
+  hintsUsed           Int      @default(0)
+  streakDays          Int      @default(0)
+  lastActiveDate      DateTime @default(now())
+  topicBreakdown      Json?
+  difficultyBreakdown Json?
+  updatedAt           DateTime @updatedAt
+}

@@ -1,0 +1,68 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+.next/
+out/
+build/
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Prisma
+apps/server/prisma/migrations/
+
+# Turbo
+.turbo/
+
+# Testing
+coverage/
+
+# Docker volumes
+docker/data/
+
+# Logs
+*.log
+npm-debug.log*
+
+# FAISS persistence (production data)
+ai-service/data/faiss_indexes/
+ai-service/data/knowledge_base/
+
+# Legacy tree-sitter WASM (no longer needed)
+apps/server/src/services/ast/wasm/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+.Python
+*.egg-info/
+*.egg
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+ai-service/data/
+ai-service/logs/
+
