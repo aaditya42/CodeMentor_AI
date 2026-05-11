@@ -18,12 +18,6 @@ An AI-powered Coding Mentorship Platform that provides progressive hints, comple
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and fill in the missing values.
-
-```bash
-cp .env.example .env
-```
-
 Key environment variables to configure:
 *   `DATABASE_URL`: PostgreSQL connection string
 *   `REDIS_URL`: Redis connection string
@@ -59,19 +53,3 @@ npm install
 npm run dev
 ```
 *The web interface will run on http://localhost:3000.*
-
-## Deployment
-
-For production deployment, ensure all environment variables are securely set. Build both the backend and frontend:
-
-**Backend:**
-```bash
-npm run build
-npm start
-```
-
-**Frontend:**
-```bash
-npm run build
-npm start
-```
