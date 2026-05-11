@@ -143,12 +143,12 @@ export class AuthService {
   }
 
   private generateTokens(payload: TokenPayload) {
-    const accessToken = jwt.sign(payload, config.JWT_SECRET, {
-      expiresIn: config.JWT_EXPIRES_IN,
+    const accessToken = jwt.sign(payload, config.JWT_SECRET as string, {
+      expiresIn: config.JWT_EXPIRES_IN as any,
     });
 
-    const refreshToken = jwt.sign(payload, config.JWT_REFRESH_SECRET, {
-      expiresIn: config.JWT_REFRESH_EXPIRES_IN,
+    const refreshToken = jwt.sign(payload, config.JWT_REFRESH_SECRET as string, {
+      expiresIn: config.JWT_REFRESH_EXPIRES_IN as any,
     });
 
     return { accessToken, refreshToken };

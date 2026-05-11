@@ -11,8 +11,18 @@ router.get('/', async (req: Request, res: Response) => {
     const skip = (Number(page) - 1) * Number(limit);
 
     const where: any = {};
-    if (difficulty) where.difficulty = String(difficulty);
-    if (topic) where.topics = { has: String(topic) };
+    if (difficulty) {
+      where.difficulty = Array.isArray(difficulty)
+        ? difficulty[0]
+        : difficulty;
+    }
+    if (topic) {
+      where.topics = {
+        has: Array.isArray(topic)
+          ? topic[0]
+          : topic
+      };
+    }
 
     const [problems, total] = await Promise.all([
       prisma.problem.findMany({
