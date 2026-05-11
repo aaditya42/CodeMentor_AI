@@ -19,6 +19,12 @@
     "clean": "turbo run clean"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/compression": "^1.8.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.6.2",
     "turbo": "^2.3.0",
     "typescript": "^5.7.0"
   },
