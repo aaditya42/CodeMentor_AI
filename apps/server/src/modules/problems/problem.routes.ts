@@ -50,7 +50,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/:slug', async (req: Request, res: Response) => {
   try {
     const problem = await prisma.problem.findUnique({
-      where: { slug: req.params.slug },
+      where: { slug: String(req.params.slug) },
       include: {
         testCases: {
           where: { isHidden: false },
