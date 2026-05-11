@@ -1,14 +1,13 @@
 """
 LLM Provider abstraction with retry logic and automatic failover.
-Supports OpenAI and Anthropic with configurable fallback chains.
+Supports Google Gemini.
 """
 
-from typing import AsyncIterator, Optional
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage
+from typing import AsyncIterator, Optional, Any
+from langchain_core.messages import BaseMessage
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+import google.generativeai as genai
 
 from app.core.config import settings, LLMProvider
 from app.core.logging import get_logger, log_latency
@@ -23,32 +22,15 @@ class LLMProviderManager:
     """
 
     def __init__(self):
-        self._models: dict[str, BaseChatModel] = {}
+        self._models: dict[str, Any] = {}
         self._initialize_providers()
 
     def _initialize_providers(self):
         """Initialize all configured LLM providers."""
-        if settings.OPENAI_API_KEY:
-            self._models["openai"] = ChatOpenAI(
-                api_key=settings.OPENAI_API_KEY,
-                model=settings.DEFAULT_MODEL if settings.DEFAULT_PROVIDER == LLMProvider.OPENAI else "gpt-4o-mini",
-                temperature=settings.LLM_TEMPERATURE,
-                max_tokens=settings.LLM_MAX_TOKENS,
-                timeout=settings.LLM_TIMEOUT,
-                max_retries=2,
-            )
-            logger.info("OpenAI provider initialized", model=self._models["openai"].model_name)
-
-        if settings.ANTHROPIC_API_KEY:
-            self._models["anthropic"] = ChatAnthropic(
-                api_key=settings.ANTHROPIC_API_KEY,
-                model_name=settings.FALLBACK_MODEL if settings.DEFAULT_PROVIDER == LLMProvider.OPENAI else settings.DEFAULT_MODEL,
-                temperature=settings.LLM_TEMPERATURE,
-                max_tokens=settings.LLM_MAX_TOKENS,
-                timeout=settings.LLM_TIMEOUT,
-                max_retries=2,
-            )
-            logger.info("Anthropic provider initialized")
+        if settings.GEMINI_API_KEY:
+            genai.configure(api_key=settings.GEMINI_API_KEY)
+            self._models["gemini"] = genai.GenerativeModel("gemini-1.5-flash")
+            logger.info("Gemini provider initialized")
 
         if not self._models:
             logger.warning("No LLM providers configured — AI features will be unavailable")
@@ -59,39 +41,18 @@ class LLMProviderManager:
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         streaming: bool = False,
-    ) -> BaseChatModel:
+    ) -> Any:
         """Get a configured LLM model instance."""
         provider_name = provider or settings.DEFAULT_PROVIDER.value
 
         if provider_name not in self._models:
-            # Fallback to any available provider
             if self._models:
                 provider_name = next(iter(self._models))
                 logger.warning(f"Requested provider unavailable, falling back to {provider_name}")
             else:
                 raise RuntimeError("No LLM providers configured")
 
-        model = self._models[provider_name]
-
-        # Apply overrides if needed
-        kwargs = {}
-        if temperature is not None:
-            kwargs["temperature"] = temperature
-        if max_tokens is not None:
-            kwargs["max_tokens"] = max_tokens
-        if streaming:
-            kwargs["streaming"] = True
-
-        if kwargs:
-            return model.bind(**{}) if not kwargs else model.__class__(
-                **({"api_key": settings.OPENAI_API_KEY, "model": model.model_name} if provider_name == "openai"
-                   else {"api_key": settings.ANTHROPIC_API_KEY, "model_name": getattr(model, 'model_name', settings.DEFAULT_MODEL)}),
-                temperature=temperature or settings.LLM_TEMPERATURE,
-                max_tokens=max_tokens or settings.LLM_MAX_TOKENS,
-                streaming=streaming,
-            )
-
-        return model
+        return self._models[provider_name]
 
     @log_latency("llm_invoke")
     async def invoke(
@@ -106,24 +67,7 @@ class LLMProviderManager:
         Tries primary provider first, falls back on failure.
         """
         primary = provider or settings.DEFAULT_PROVIDER.value
-        fallback = settings.FALLBACK_PROVIDER.value if settings.FALLBACK_PROVIDER else None
-
-        # Try primary
-        try:
-            return await self._invoke_provider(primary, messages, temperature, max_tokens)
-        except Exception as e:
-            logger.warning(f"Primary provider {primary} failed: {e}")
-
-            # Try fallback
-            if fallback and fallback != primary and fallback in self._models:
-                logger.info(f"Attempting fallback provider: {fallback}")
-                try:
-                    return await self._invoke_provider(fallback, messages, temperature, max_tokens)
-                except Exception as e2:
-                    logger.error(f"Fallback provider {fallback} also failed: {e2}")
-                    raise e2
-
-            raise e
+        return await self._invoke_provider(primary, messages, temperature, max_tokens)
 
     @retry(
         stop=stop_after_attempt(3),
@@ -139,8 +83,19 @@ class LLMProviderManager:
     ) -> str:
         """Invoke a specific provider with retry logic."""
         model = self.get_model(provider, temperature, max_tokens)
-        response = await model.ainvoke(messages)
-        return response.content if isinstance(response.content, str) else str(response.content)
+        
+        prompt = "\\n\\n".join([str(m.content) for m in messages])
+        
+        generation_config = genai.types.GenerationConfig(
+            temperature=temperature if temperature is not None else settings.LLM_TEMPERATURE,
+            max_output_tokens=max_tokens if max_tokens is not None else settings.LLM_MAX_TOKENS,
+        )
+        
+        response = await model.generate_content_async(
+            prompt,
+            generation_config=generation_config
+        )
+        return response.text
 
     async def stream(
         self,
@@ -151,31 +106,36 @@ class LLMProviderManager:
     ) -> AsyncIterator[str]:
         """Stream LLM response tokens with failover."""
         primary = provider or settings.DEFAULT_PROVIDER.value
-
+        
         try:
             model = self.get_model(primary, temperature, max_tokens, streaming=True)
-            async for chunk in model.astream(messages):
-                text = chunk.content if isinstance(chunk.content, str) else str(chunk.content)
-                if text:
-                    yield text
+            
+            prompt = "\\n\\n".join([str(m.content) for m in messages])
+            
+            generation_config = genai.types.GenerationConfig(
+                temperature=temperature if temperature is not None else settings.LLM_TEMPERATURE,
+                max_output_tokens=max_tokens if max_tokens is not None else settings.LLM_MAX_TOKENS,
+            )
+            
+            response = await model.generate_content_async(
+                prompt,
+                generation_config=generation_config,
+                stream=True
+            )
+            
+            async for chunk in response:
+                if chunk.text:
+                    yield chunk.text
+                    
         except Exception as e:
             logger.warning(f"Streaming from {primary} failed: {e}")
-            fallback = settings.FALLBACK_PROVIDER.value if settings.FALLBACK_PROVIDER else None
-            if fallback and fallback != primary and fallback in self._models:
-                model = self.get_model(fallback, temperature, max_tokens, streaming=True)
-                async for chunk in model.astream(messages):
-                    text = chunk.content if isinstance(chunk.content, str) else str(chunk.content)
-                    if text:
-                        yield text
-            else:
-                raise
+            raise
 
     @property
     def available_providers(self) -> dict[str, bool]:
         """Return which providers are configured."""
         return {
-            "openai": "openai" in self._models,
-            "anthropic": "anthropic" in self._models,
+            "gemini": "gemini" in self._models,
         }
 
 
