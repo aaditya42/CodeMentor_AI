@@ -19,10 +19,10 @@ COPY . .
 # Create directories for persistent data
 RUN mkdir -p /app/data/faiss_indexes /app/data/knowledge_base /app/logs
 
-EXPOSE 8000
+EXPOSE 10000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8000/health')" || exit 1
+    CMD python -c "import httpx; httpx.get('http://localhost:10000/health')" || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000} --workers 2
