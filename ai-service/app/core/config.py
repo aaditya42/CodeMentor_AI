@@ -31,9 +31,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
     DEFAULT_PROVIDER: LLMProvider = LLMProvider.GEMINI
-    DEFAULT_MODEL: str = "gemini-1.5-flash"
+    DEFAULT_MODEL: str = "gemini-2.0-flash"
     FALLBACK_PROVIDER: Optional[LLMProvider] = None
-    FALLBACK_MODEL: str = "gemini-1.5-flash"
+    FALLBACK_MODEL: str = "gemini-2.0-flash"
     MAX_RETRIES: int = 3
     RETRY_DELAY: float = 1.0
     LLM_TIMEOUT: int = 60
