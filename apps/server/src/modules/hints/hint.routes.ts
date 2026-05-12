@@ -15,12 +15,17 @@ router.post('/generate', async (req: Request, res: Response) => {
     }
 
     // AST analysis
+    logger.info('Starting AST analysis');
     const analysis = await aiClient.analyzeCode(code, language);
+    logger.info('AST analysis completed');
 
     // Complexity analysis
+    logger.info('Starting complexity analysis');
     const complexity = await aiClient.analyzeComplexity(code, language);
+    logger.info('Complexity analysis completed');
 
     // Generate hint
+    logger.info('Starting hint generation');
     const hint = await aiClient.generateHint({
       problemId,
       problemTitle: '', // Would be fetched from DB in full integration
@@ -30,6 +35,7 @@ router.post('/generate', async (req: Request, res: Response) => {
       hintLevel: requestedLevel || 1,
       userMessage,
     });
+    logger.info('Hint generation completed');
 
     res.json({
       data: {
@@ -49,6 +55,7 @@ router.post('/generate', async (req: Request, res: Response) => {
 // GET /api/hints/stream — SSE streaming hint
 router.get('/stream', async (req: Request, res: Response) => {
   const sse = new SSEHandler(res);
+
   try {
     const { problemId, code, language, requestedLevel } = req.query;
 
@@ -69,8 +76,10 @@ router.get('/stream', async (req: Request, res: Response) => {
 
     for await (const chunk of stream) {
       if (sse.isClosed) break;
+
       try {
         const parsed = JSON.parse(chunk);
+
         if (parsed.type === 'hint_chunk') {
           sse.sendChunk(parsed.content);
         } else if (parsed.type === 'analysis') {

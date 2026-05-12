@@ -1,21 +1,24 @@
+"use strict";
 // ============================================
 // Shared Constants — CodeMentor AI
 // ============================================
-export const DIFFICULTIES = ['EASY', 'MEDIUM', 'HARD'];
-export const LANGUAGES = ['PYTHON', 'CPP', 'JAVA', 'JAVASCRIPT'];
-export const LANGUAGE_DISPLAY = {
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.API_ROUTES = exports.DIFFICULTY_COLORS = exports.HINT_LEVEL_DESCRIPTIONS = exports.TOPICS = exports.LANGUAGE_MONACO_MAP = exports.LANGUAGE_DISPLAY = exports.LANGUAGES = exports.DIFFICULTIES = void 0;
+exports.DIFFICULTIES = ['EASY', 'MEDIUM', 'HARD'];
+exports.LANGUAGES = ['PYTHON', 'CPP', 'JAVA', 'JAVASCRIPT'];
+exports.LANGUAGE_DISPLAY = {
     PYTHON: 'Python',
     CPP: 'C++',
     JAVA: 'Java',
     JAVASCRIPT: 'JavaScript',
 };
-export const LANGUAGE_MONACO_MAP = {
+exports.LANGUAGE_MONACO_MAP = {
     PYTHON: 'python',
     CPP: 'cpp',
     JAVA: 'java',
     JAVASCRIPT: 'javascript',
 };
-export const TOPICS = [
+exports.TOPICS = [
     'Arrays',
     'Strings',
     'Hash Table',
@@ -39,19 +42,19 @@ export const TOPICS = [
     'Trie',
     'Recursion',
 ];
-export const HINT_LEVEL_DESCRIPTIONS = {
+exports.HINT_LEVEL_DESCRIPTIONS = {
     1: 'Conceptual Guidance — High-level thinking direction',
     2: 'Algorithmic Direction — Specific approach suggestions',
     3: 'Partial Pseudocode — Step-by-step logic outline',
     4: 'Optimization Guidance — Performance improvement strategies',
     5: 'Implementation Hints — Detailed code-level guidance',
 };
-export const DIFFICULTY_COLORS = {
+exports.DIFFICULTY_COLORS = {
     EASY: '#00b8a3',
     MEDIUM: '#ffc01e',
     HARD: '#ff375f',
 };
-export const API_ROUTES = {
+exports.API_ROUTES = {
     AUTH: {
         REGISTER: '/api/auth/register',
         LOGIN: '/api/auth/login',
