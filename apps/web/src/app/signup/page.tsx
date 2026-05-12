@@ -14,7 +14,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | string[]>("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -27,7 +27,12 @@ export default function SignupPage() {
       setAuth(data.user, data.accessToken, data.refreshToken);
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err.response?.data?.error || "Registration failed");
+      const issues = err.response?.data?.details?.issues;
+      if (Array.isArray(issues) && issues.length > 0) {
+        setError(issues.map((issue: any) => issue.message));
+      } else {
+        setError(err.response?.data?.error || "Registration failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -54,7 +59,15 @@ export default function SignupPage() {
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             {error && (
-              <div className="rounded-lg bg-rose-500/10 border border-rose-500/20 px-4 py-2.5 text-sm text-rose-400">{error}</div>
+              <div className="rounded-lg bg-rose-500/10 border border-rose-500/20 px-4 py-2.5 text-sm text-rose-400">
+                {Array.isArray(error) ? (
+                  error.map((msg, idx) => (
+                    <div key={idx}>{msg}</div>
+                  ))
+                ) : (
+                  error
+                )}
+              </div>
             )}
 
             <div>
