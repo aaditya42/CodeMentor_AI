@@ -38,7 +38,7 @@ aiClient.interceptors.response.use(
     if (!config) throw error;
 
     const retryCount = (config as any).__retryCount || 0;
-    const maxRetries = 2;
+    const maxRetries = 1;
 
     if (retryCount < maxRetries && error.response?.status && error.response.status >= 500) {
       (config as any).__retryCount = retryCount + 1;
