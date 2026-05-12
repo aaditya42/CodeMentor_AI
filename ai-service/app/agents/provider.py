@@ -29,7 +29,7 @@ class LLMProviderManager:
         """Initialize all configured LLM providers."""
         if settings.GEMINI_API_KEY:
             genai.configure(api_key=settings.GEMINI_API_KEY)
-            self._models["gemini"] = genai.GenerativeModel("gemini-1.5-flash")
+            self._models["gemini"] = genai.GenerativeModel("gemini-2.0-flash")
             logger.info("Gemini provider initialized")
 
         if not self._models:
