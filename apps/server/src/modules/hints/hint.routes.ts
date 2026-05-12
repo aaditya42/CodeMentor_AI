@@ -16,12 +16,22 @@ router.post('/generate', async (req: Request, res: Response) => {
 
     // AST analysis
     logger.info('Starting AST analysis');
-    const analysis = await aiClient.analyzeCode(code, language);
+    const analysis = await Promise.race([
+      aiClient.analyzeCode(code, language),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('AST timeout')), 20000)
+      ),
+    ]);
     logger.info('AST analysis completed');
 
     // Complexity analysis
     logger.info('Starting complexity analysis');
-    const complexity = await aiClient.analyzeComplexity(code, language);
+    const complexity = await Promise.race([
+      aiClient.analyzeComplexity(code, language),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Complexity timeout')), 20000)
+      ),
+    ]);
     logger.info('Complexity analysis completed');
 
     // Generate hint
