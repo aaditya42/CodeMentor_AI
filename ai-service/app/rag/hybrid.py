@@ -22,8 +22,8 @@ def _get_reranker():
     global _reranker
     if _reranker is None and settings.RERANK_ENABLED:
         try:
-            from sentence_transformers import CrossEncoder
-            _reranker = CrossEncoder(settings.RERANK_MODEL, max_length=512)
+            from fastembed.rerank.cross_encoder import TextCrossEncoder
+            _reranker = TextCrossEncoder(model_name=settings.RERANK_MODEL)
             logger.info("Reranker loaded", model=settings.RERANK_MODEL)
         except Exception as e:
             logger.warning(f"Failed to load reranker: {e}")
@@ -98,9 +98,9 @@ def hybrid_search(
     if settings.RERANK_ENABLED and candidates:
         reranker = _get_reranker()
         if reranker:
-            pairs = [(query, c["doc"]["content"]) for c in candidates]
+            documents = [c["doc"]["content"] for c in candidates]
             try:
-                rerank_scores = reranker.predict(pairs)
+                rerank_scores = list(reranker.rerank(query, documents))
                 for i, score in enumerate(rerank_scores):
                     candidates[i]["score"] = float(score)
                 candidates.sort(key=lambda x: x["score"], reverse=True)

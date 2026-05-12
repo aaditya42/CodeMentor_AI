@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     LLM_MAX_TOKENS: int = 2048
 
     # --- Embeddings ---
-    EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
+    EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
     EMBEDDING_DIMENSIONS: int = 384
 
     # --- FAISS ---
@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     BM25_WEIGHT: float = 0.4
     DENSE_WEIGHT: float = 0.6
     RERANK_ENABLED: bool = True
-    RERANK_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    RERANK_MODEL: str = "Xenova/ms-marco-MiniLM-L-6-v2"
 
     # --- Guardrails ---
     MAX_HINT_LEVEL: int = 5

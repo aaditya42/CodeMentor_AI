@@ -1,5 +1,5 @@
 """
-Embedding service using sentence-transformers.
+Embedding service using fastembed.
 Generates dense vector embeddings for knowledge base documents and queries.
 """
 
@@ -17,10 +17,10 @@ def _get_model():
     """Lazy-load the embedding model."""
     global _model
     if _model is None:
-        from sentence_transformers import SentenceTransformer
+        from fastembed import TextEmbedding
         logger.info("Loading embedding model", model=settings.EMBEDDING_MODEL)
-        _model = SentenceTransformer(settings.EMBEDDING_MODEL)
-        logger.info("Embedding model loaded", dimensions=_model.get_sentence_embedding_dimension())
+        _model = TextEmbedding(settings.EMBEDDING_MODEL)
+        logger.info("Embedding model loaded", dimensions=settings.EMBEDDING_DIMENSIONS)
     return _model
 
 
@@ -28,7 +28,7 @@ def _get_model():
 def generate_embeddings(texts: list[str]) -> np.ndarray:
     """Generate dense embeddings for a list of texts."""
     model = _get_model()
-    embeddings = model.encode(texts, show_progress_bar=False, normalize_embeddings=True)
+    embeddings = list(model.embed(texts))
     return np.array(embeddings, dtype=np.float32)
 
 
@@ -39,5 +39,4 @@ def generate_query_embedding(query: str) -> np.ndarray:
 
 def get_embedding_dimension() -> int:
     """Get the dimensionality of the embedding model."""
-    model = _get_model()
-    return model.get_sentence_embedding_dimension()
+    return settings.EMBEDDING_DIMENSIONS
