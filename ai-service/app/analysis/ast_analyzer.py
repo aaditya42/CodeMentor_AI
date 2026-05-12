@@ -73,7 +73,8 @@ def _analyze_tree_sitter(code: str, language: str) -> AnalysisAccumulator:
     if not lang:
         return _analyze_regex(code, language)
 
-    parser = Parser(lang)
+    parser = Parser()
+    parser.language = lang
     tree = parser.parse(bytes(code, "utf-8"))
     root = tree.root_node
 
