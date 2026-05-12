@@ -8,43 +8,63 @@ const router = Router();
 // POST /api/hints/generate — generate a hint (non-streaming)
 router.post('/generate', async (req: Request, res: Response) => {
   try {
-    const { problemId, code, language, conversationId, requestedLevel, userMessage } = req.body;
+    const { problemId, code, language, requestedLevel, userMessage } = req.body;
 
     if (!problemId || !code || !language) {
-      return res.status(400).json({ error: 'problemId, code, and language are required' });
+      return res.status(400).json({
+        error: 'problemId, code, and language are required',
+      });
     }
 
-    // AST analysis
-    logger.info('Starting AST analysis');
-    const analysis = await Promise.race([
-      aiClient.analyzeCode(code, language),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('AST timeout')), 20000)
-      ),
-    ]);
-    logger.info('AST analysis completed');
+    // ---------------- AST ANALYSIS ----------------
+    let analysis = null;
 
-    // Complexity analysis
-    logger.info('Starting complexity analysis');
-    const complexity = await Promise.race([
-      aiClient.analyzeComplexity(code, language),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Complexity timeout')), 20000)
-      ),
-    ]);
-    logger.info('Complexity analysis completed');
+    try {
+      logger.info('Starting AST analysis');
 
-    // Generate hint
+      analysis = await Promise.race([
+        aiClient.analyzeCode(code, language),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('AST timeout')), 20000)
+        ),
+      ]);
+
+      logger.info('AST analysis completed');
+    } catch (err) {
+      logger.error('AST analysis failed:', err);
+    }
+
+    // ---------------- COMPLEXITY ANALYSIS ----------------
+    let complexity = null;
+
+    try {
+      logger.info('Starting complexity analysis');
+
+      complexity = await Promise.race([
+        aiClient.analyzeComplexity(code, language),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Complexity timeout')), 20000)
+        ),
+      ]);
+
+      logger.info('Complexity analysis completed');
+    } catch (err) {
+      logger.error('Complexity analysis failed:', err);
+    }
+
+    // ---------------- HINT GENERATION ----------------
     logger.info('Starting hint generation');
+
     const hint = await aiClient.generateHint({
       problemId,
-      problemTitle: '', // Would be fetched from DB in full integration
+      problemTitle: '',
       problemDescription: '',
       code,
       language,
       hintLevel: requestedLevel || 1,
       userMessage,
     });
+
     logger.info('Hint generation completed');
 
     res.json({
@@ -58,7 +78,10 @@ router.post('/generate', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     logger.error('Hint generation failed:', error);
-    res.status(500).json({ error: 'Failed to generate hint' });
+
+    res.status(500).json({
+      error: error.message || 'Failed to generate hint',
+    });
   }
 });
 
