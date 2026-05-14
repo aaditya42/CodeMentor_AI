@@ -62,10 +62,14 @@ export function HintSidebar({ problem }: HintSidebarProps) {
     }
 
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
-      const response = await fetch(`${API_BASE}/hints/stream`, {
+      const API_BASE =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+
+      const response = await fetch(`${API_BASE}/hints/generate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           problemId: problem.id,
           code,
@@ -75,55 +79,32 @@ export function HintSidebar({ problem }: HintSidebarProps) {
         }),
       });
 
-      if (!response.ok || !response.body) {
-        throw new Error("AI service temporarily unavailable. Please retry shortly.");
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result?.error ||
+          "AI service temporarily unavailable. Please retry shortly."
+        );
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let fullContent = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const dataStr = line.slice(6).trim();
-            if (!dataStr) continue;
-
-            try {
-              const parsed = JSON.parse(dataStr);
-              if (parsed.type === 'hint_chunk') {
-                appendStreamingContent(parsed.content);
-                fullContent += parsed.content;
-              } else if (parsed.type === 'analysis') {
-                setASTAnalysis(parsed.data);
-              } else if (parsed.type === 'complexity') {
-                setComplexityAnalysis(parsed.data);
-              } else if (parsed.type === 'provider_status') {
-                setLoadingText(parsed.message || parsed.content);
-              } else if (parsed.type === 'error') {
-                throw new Error(parsed.message || "AI service temporarily unavailable. Please retry shortly.");
-              }
-            } catch (e) {
-              if (e instanceof Error && e.message.includes("temporarily unavailable")) throw e;
-            }
-          }
-        }
+      // AST Analysis
+      if (result?.data?.analysis) {
+        setASTAnalysis(result.data.analysis);
       }
 
-      if (fullContent) {
+      // Complexity Analysis
+      if (result?.data?.complexity) {
+        setComplexityAnalysis(result.data.complexity);
+      }
+
+      // Hint Content
+      if (result?.data?.content) {
         addHint({
           id: `hint-${Date.now()}`,
           role: "assistant",
-          content: fullContent,
-          hintLevel: currentHintLevel,
+          content: result.data.content,
+          hintLevel: result.data.hintLevel,
           timestamp: Date.now(),
         });
       }
@@ -131,7 +112,9 @@ export function HintSidebar({ problem }: HintSidebarProps) {
       addHint({
         id: `hint-${Date.now()}`,
         role: "assistant",
-        content: error.message || "AI service temporarily unavailable. Please retry shortly.",
+        content:
+          error.message ||
+          "AI service temporarily unavailable. Please retry shortly.",
         timestamp: Date.now(),
       });
     } finally {
@@ -169,8 +152,8 @@ export function HintSidebar({ problem }: HintSidebarProps) {
               <div className={cn(
                 "flex h-6 w-6 items-center justify-center rounded-full transition-all",
                 isCompleted ? `${meta.bg} ${meta.color}` :
-                isCurrent ? "border-2 border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.1)]" :
-                "border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]",
+                  isCurrent ? "border-2 border-[hsl(var(--primary))] bg-[hsl(var(--primary)/.1)]" :
+                    "border border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]",
               )}>
                 {isCompleted ? (
                   <CheckCircle2 className="h-3 w-3" />
@@ -370,7 +353,7 @@ export function HintSidebar({ problem }: HintSidebarProps) {
         ))}
 
         {/* Streaming content */}
-        {isStreamingHint && streamingContent && (
+        {isStreamingHint && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
