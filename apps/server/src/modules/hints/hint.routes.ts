@@ -85,12 +85,12 @@ router.post('/generate', async (req: Request, res: Response) => {
       error?.message?.includes('timeout')
     ) {
       return res.status(503).json({
-        error: 'AI service waking up, retry in a few seconds',
+        error: 'AI service temporarily unavailable. Please retry shortly.',
       });
     }
 
     return res.status(500).json({
-      error: error.message || 'Failed to generate hint',
+      error: 'AI service temporarily unavailable. Please retry shortly.',
     });
   }
 });
@@ -129,6 +129,8 @@ router.get('/stream', async (req: Request, res: Response) => {
           sse.sendAnalysis(parsed.data);
         } else if (parsed.type === 'complexity') {
           sse.sendComplexity(parsed.data);
+        } else if (parsed.type === 'provider_status') {
+          sse.sendProviderStatus(parsed.content);
         } else if (parsed.type === 'hint_complete') {
           sse.sendComplete('');
         }
@@ -142,7 +144,61 @@ router.get('/stream', async (req: Request, res: Response) => {
     }
   } catch (error: any) {
     logger.error('Streaming hint failed:', error);
-    sse.sendError('Failed to stream hint');
+    sse.sendError('AI service temporarily unavailable. Please retry shortly.');
+  }
+});
+
+// POST /api/hints/stream — SSE streaming hint via POST (for large payloads)
+router.post('/stream', async (req: Request, res: Response) => {
+  const sse = new SSEHandler(res);
+
+  try {
+    const { problemId, code, language, requestedLevel, userMessage } = req.body;
+
+    if (!problemId || !code || !language) {
+      sse.sendError('Missing required parameters');
+      return;
+    }
+
+    // Stream from Python service
+    const stream = aiClient.streamHint({
+      problemId: String(problemId),
+      problemTitle: '',
+      problemDescription: '',
+      code: String(code),
+      language: String(language),
+      hintLevel: Number(requestedLevel) || 1,
+      userMessage,
+    });
+
+    for await (const chunk of stream) {
+      if (sse.isClosed) break;
+
+      try {
+        const parsed = JSON.parse(chunk);
+
+        if (parsed.type === 'hint_chunk') {
+          sse.sendChunk(parsed.content);
+        } else if (parsed.type === 'analysis') {
+          sse.sendAnalysis(parsed.data);
+        } else if (parsed.type === 'complexity') {
+          sse.sendComplexity(parsed.data);
+        } else if (parsed.type === 'provider_status') {
+          sse.sendProviderStatus(parsed.content);
+        } else if (parsed.type === 'hint_complete') {
+          sse.sendComplete('');
+        }
+      } catch {
+        sse.sendChunk(chunk);
+      }
+    }
+
+    if (!sse.isClosed) {
+      sse.sendComplete('');
+    }
+  } catch (error: any) {
+    logger.error('Streaming hint failed:', error);
+    sse.sendError('AI service temporarily unavailable. Please retry shortly.');
   }
 });
 

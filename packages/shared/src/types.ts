@@ -279,4 +279,5 @@ export type SSEEvent =
   | { type: 'hint_complete'; hintId: string }
   | { type: 'analysis'; data: ASTAnalysis }
   | { type: 'complexity'; data: ComplexityAnalysis }
+  | { type: 'provider_status'; message: string }
   | { type: 'error'; message: string };

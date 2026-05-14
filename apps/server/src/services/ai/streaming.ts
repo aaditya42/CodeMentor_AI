@@ -52,6 +52,10 @@ export class SSEHandler {
     this.sendEvent({ type: 'complexity', data });
   }
 
+  sendProviderStatus(message: string) {
+    this.sendEvent({ type: 'provider_status', message });
+  }
+
   sendComplete(hintId: string) {
     this.sendEvent({ type: 'hint_complete', hintId });
     this.close();

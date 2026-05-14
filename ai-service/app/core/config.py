@@ -13,6 +13,8 @@ class LLMProvider(str, Enum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     GEMINI = "gemini"
+    GROQ = "groq"
+
 
 
 class Settings(BaseSettings):
@@ -27,16 +29,17 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # --- AI Providers ---
+    GROQ_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
     OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
-    DEFAULT_PROVIDER: LLMProvider = LLMProvider.GEMINI
-    DEFAULT_MODEL: str = "gemini-2.0-flash"
-    FALLBACK_PROVIDER: Optional[LLMProvider] = None
-    FALLBACK_MODEL: str = "gemini-2.0-flash"
-    MAX_RETRIES: int = 3
+    PRIMARY_PROVIDER: LLMProvider = LLMProvider.GROQ
+    PRIMARY_MODEL: str = "llama-3.3-70b-versatile"
+    SECONDARY_PROVIDER: Optional[LLMProvider] = LLMProvider.GEMINI
+    SECONDARY_MODEL: str = "gemini-2.0-flash"
+    MAX_RETRIES: int = 2
     RETRY_DELAY: float = 1.0
-    LLM_TIMEOUT: int = 60
+    LLM_TIMEOUT: int = 15
     LLM_TEMPERATURE: float = 0.3
     LLM_MAX_TOKENS: int = 2048
 

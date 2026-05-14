@@ -35,6 +35,7 @@ export function HintSidebar({ problem }: HintSidebarProps) {
   } = useWorkspaceStore();
 
   const [userMessage, setUserMessage] = useState("");
+  const [loadingText, setLoadingText] = useState("Generating AI hint...");
   const [analysisOpen, setAnalysisOpen] = useState(true);
   const [retrievalOpen, setRetrievalOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -48,6 +49,7 @@ export function HintSidebar({ problem }: HintSidebarProps) {
 
     setIsStreamingHint(true);
     setStreamingContent("");
+    setLoadingText("Generating AI hint...");
 
     // Add user message to chat
     if (userMessage.trim()) {
@@ -59,10 +61,9 @@ export function HintSidebar({ problem }: HintSidebarProps) {
       });
     }
 
-    // Simulate streaming (will be connected to real SSE endpoint)
     try {
       const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
-      const response = await fetch(`${API_BASE}/hints/generate`, {
+      const response = await fetch(`${API_BASE}/hints/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -74,92 +75,70 @@ export function HintSidebar({ problem }: HintSidebarProps) {
         }),
       });
 
-      if (!response.ok) {
-        // Fallback with demo hint
-        simulateDemoHint();
-        return;
+      if (!response.ok || !response.body) {
+        throw new Error("AI service temporarily unavailable. Please retry shortly.");
       }
 
-      const data = await response.json();
-      if (data.data?.analysis) setASTAnalysis(data.data.analysis);
-      if (data.data?.complexity) setComplexityAnalysis(data.data.complexity);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullContent = "";
 
-      const content = data.data?.content || "Consider the problem structure...";
-      // Simulate streaming effect
-      for (let i = 0; i < content.length; i++) {
-        await new Promise((r) => setTimeout(r, 15));
-        appendStreamingContent(content[i]);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6).trim();
+            if (!dataStr) continue;
+
+            try {
+              const parsed = JSON.parse(dataStr);
+              if (parsed.type === 'hint_chunk') {
+                appendStreamingContent(parsed.content);
+                fullContent += parsed.content;
+              } else if (parsed.type === 'analysis') {
+                setASTAnalysis(parsed.data);
+              } else if (parsed.type === 'complexity') {
+                setComplexityAnalysis(parsed.data);
+              } else if (parsed.type === 'provider_status') {
+                setLoadingText(parsed.message || parsed.content);
+              } else if (parsed.type === 'error') {
+                throw new Error(parsed.message || "AI service temporarily unavailable. Please retry shortly.");
+              }
+            } catch (e) {
+              if (e instanceof Error && e.message.includes("temporarily unavailable")) throw e;
+            }
+          }
+        }
       }
 
+      if (fullContent) {
+        addHint({
+          id: `hint-${Date.now()}`,
+          role: "assistant",
+          content: fullContent,
+          hintLevel: currentHintLevel,
+          timestamp: Date.now(),
+        });
+      }
+    } catch (error: any) {
       addHint({
         id: `hint-${Date.now()}`,
         role: "assistant",
-        content,
-        hintLevel: currentHintLevel,
+        content: error.message || "AI service temporarily unavailable. Please retry shortly.",
         timestamp: Date.now(),
       });
-    } catch {
-      simulateDemoHint();
     } finally {
       setIsStreamingHint(false);
       setStreamingContent("");
       setUserMessage("");
     }
-  };
-
-  const simulateDemoHint = async () => {
-    const demoHints: Record<number, string> = {
-      1: "🤔 Think about what data structure allows you to check if a value exists in **O(1)** time. What if you could store each number you've seen along with its index?",
-      2: "💡 Consider using a **Hash Map** (dictionary). As you iterate through the array, for each element, compute `target - nums[i]`. Check if this complement already exists in your hash map.",
-      3: "📝 **Pseudocode:**\n1. Create an empty hash map\n2. For each index `i` in `nums`:\n   - Calculate `complement = target - nums[i]`\n   - If `complement` exists in hash map, return `[map[complement], i]`\n   - Otherwise, store `nums[i] → i` in the hash map\n3. Return empty (shouldn't reach here per constraints)",
-      4: "⚡ **Complexity Analysis:**\n- Your current nested loop approach is **O(n²)** — it checks every pair\n- With a hash map, you can achieve **O(n)** time and **O(n)** space\n- The key insight: instead of searching for a pair, search for the complement of each element",
-      5: "🔧 **Key Implementation Details:**\n```python\ndef twoSum(nums, target):\n    seen = {}  # value → index\n    for i, num in enumerate(nums):\n        complement = target - num\n        if complement in seen:\n            return [seen[complement], i]\n        seen[num] = i\n```\nEdge case: ensure you don't match an element with itself.",
-    };
-
-    const content = demoHints[currentHintLevel] || demoHints[1];
-
-    // Demo AST analysis
-    setASTAnalysis({
-      language: language.toLowerCase(),
-      algorithmPattern: currentHintLevel <= 2 ? "Brute Force" : "Hash Map Lookup",
-      detectedPatterns: ["brute_force"],
-      estimatedTimeComplexity: "O(n²)",
-      estimatedSpaceComplexity: "O(1)",
-      issues: [
-        { type: "performance", severity: "warning", message: "Nested loops detected — O(n²) time complexity" },
-        { type: "edge_case", severity: "warning", message: "No empty input check detected" },
-      ],
-      optimizationSuggestions: [
-        { strategy: "Hash Map", expectedComplexity: "O(n)", description: "Use hash map for O(1) lookups instead of nested loops" },
-      ],
-      recursionDetected: false,
-      dpPotential: false,
-      codeStructure: { functions: 1, loops: 2, nestedLoopDepth: 2, conditionals: 1, recursiveCalls: 0, dataStructuresUsed: [] },
-    });
-
-    setComplexityAnalysis({
-      timeComplexity: "O(n²)",
-      spaceComplexity: "O(1)",
-      isTLEProne: true,
-      redundantComputations: ["Nested loops performing repeated linear scans"],
-      suggestions: [
-        { from: "O(n²)", to: "O(n)", technique: "Hash Map", description: "Use hash map for O(1) lookups instead of nested iteration" },
-      ],
-    });
-
-    // Simulate typewriter
-    for (let i = 0; i < content.length; i++) {
-      await new Promise((r) => setTimeout(r, 12));
-      appendStreamingContent(content[i]);
-    }
-
-    addHint({
-      id: `hint-${Date.now()}`,
-      role: "assistant",
-      content,
-      hintLevel: currentHintLevel,
-      timestamp: Date.now(),
-    });
   };
 
   return (
@@ -397,9 +376,13 @@ export function HintSidebar({ problem }: HintSidebarProps) {
             animate={{ opacity: 1 }}
             className="mr-2 rounded-lg bg-[hsl(var(--background))] border border-[hsl(var(--border))] p-3"
           >
-            <div className="flex items-center gap-1.5 mb-2">
-              <div className="h-2 w-2 rounded-full bg-[hsl(var(--primary))] animate-pulse" />
-              <span className="text-[10px] font-semibold text-[hsl(var(--primary))]">Thinking...</span>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="flex gap-1">
+                <div className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))] animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))] animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))] animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+              <span className="text-[10px] font-semibold text-[hsl(var(--primary))] animate-pulse">{loadingText}</span>
             </div>
             <div className="text-sm leading-relaxed whitespace-pre-wrap streaming-cursor">
               {streamingContent}

@@ -171,6 +171,9 @@ async def generate_hint_stream(request: GenerateHintRequest) -> AsyncIterator[st
 
     # Stream LLM tokens
     async for chunk in llm_provider.stream(messages, temperature=0.4, max_tokens=1500):
-        yield json.dumps({"type": "hint_chunk", "content": chunk})
+        if chunk == "__PROVIDER_FALLBACK__":
+            yield json.dumps({"type": "provider_status", "content": "Switching AI provider..."})
+        else:
+            yield json.dumps({"type": "hint_chunk", "content": chunk})
 
     yield json.dumps({"type": "hint_complete"})
