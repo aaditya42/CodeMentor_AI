@@ -79,7 +79,17 @@ router.post('/generate', async (req: Request, res: Response) => {
   } catch (error: any) {
     logger.error('Hint generation failed:', error);
 
-    res.status(500).json({
+    // AI service cold start / temporary upstream issue
+    if (
+      error?.response?.status === 502 ||
+      error?.message?.includes('timeout')
+    ) {
+      return res.status(503).json({
+        error: 'AI service waking up, retry in a few seconds',
+      });
+    }
+
+    return res.status(500).json({
       error: error.message || 'Failed to generate hint',
     });
   }
