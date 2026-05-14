@@ -15,6 +15,7 @@ import { hintRoutes } from './modules/hints/hint.routes.js';
 import { executionRoutes } from './modules/execution/execution.routes.js';
 
 const app = express();
+app.set('trust proxy', 1);
 
 // --- Global Middleware ---
 
